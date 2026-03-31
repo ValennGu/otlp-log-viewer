@@ -1,36 +1,103 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# OTLP Log Viewer
 
-## Getting Started
+A Next.js application for visualizing OpenTelemetry (OTLP) log data. It fetches logs from a remote API, displays them in a sortable table with a severity histogram, and supports grouping by service.
 
-First, run the development server:
+## Requirements
+
+- Node.js 20+
+- npm
+
+## Running the project
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Start the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Other commands
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | Description |
+|---|---|
+| `npm run build` | Production build |
+| `npm start` | Serve the production build |
+| `npm test` | Run unit tests |
+| `npm run lint` | Lint the codebase |
 
-## Learn More
+## Architecture
 
-To learn more about Next.js, take a look at the following resources:
+```
+┌─────────────────────────────────────────────────────────┐
+│                      Browser                            │
+│                                                         │
+│   ┌─────────────────────────────────────────────────┐   │
+│   │              page.tsx  (Server)                 │   │
+│   │                                                 │   │
+│   │  On load: fetchAndTransformLogs()               │   │
+│   │      │                                          │   │
+│   │      ▼                                          │   │
+│   │  ┌──────────────────────────────────────────┐   │   │
+│   │  │         LogViewerShell  (Client)         │   │   │
+│   │  │                                          │   │   │
+│   │  │  useReducer(logViewerReducer)            │   │   │
+│   │  │                                          │   │   │
+│   │  │  ┌─────────────────────────────────┐    │   │   │
+│   │  │  │       LogViewerToolbar          │    │   │   │
+│   │  │  │  refresh · group-by-service     │    │   │   │
+│   │  │  └─────────────────────────────────┘    │   │   │
+│   │  │  ┌─────────────────────────────────┐    │   │   │
+│   │  │  │         LogHistogram            │    │   │   │
+│   │  │  │  severity breakdown over time   │    │   │   │
+│   │  │  └─────────────────────────────────┘    │   │   │
+│   │  │  ┌─────────────────────────────────┐    │   │   │
+│   │  │  │           LogTable              │    │   │   │
+│   │  │  │  ┌───────────────────────────┐  │    │   │   │
+│   │  │  │  │  LogGroupHeader (opt.)    │  │    │   │   │
+│   │  │  │  └───────────────────────────┘  │    │   │   │
+│   │  │  │  ┌───────────────────────────┐  │    │   │   │
+│   │  │  │  │      LogTableRow          │  │    │   │   │
+│   │  │  │  │  ┌─────────────────────┐  │  │    │   │   │
+│   │  │  │  │  │  LogRecordDetail    │  │  │    │   │   │
+│   │  │  │  │  │  (expanded row)     │  │  │    │   │   │
+│   │  │  │  │  └─────────────────────┘  │  │    │   │   │
+│   │  │  │  └───────────────────────────┘  │    │   │   │
+│   │  │  └─────────────────────────────────┘    │   │   │
+│   │  └──────────────────────────────────────────┘   │   │
+│   └─────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────┘
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+┌─────────────────────────────────────────────────────────┐
+│                     src/lib                             │
+│                                                         │
+│  api/                                                   │
+│    fetchLogs.ts       fetch + parse the remote API      │
+│                                                         │
+│  otlp/                                                  │
+│    types.ts           FlatLogRecord, ServiceGroup       │
+│    transform.ts       OTLP JSON → FlatLogRecord[]       │
+│    histogram.ts       records → HistogramBucket[]       │
+│    severity.ts        severity number → level + styles  │
+│                                                         │
+│  state/                                                 │
+│    logViewerReducer.ts  useReducer state & actions      │
+└─────────────────────────────────────────────────────────┘
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+External API
+  https://take-home-assignment-otlp-logs-api.vercel.app/api/logs
+  └─ returns OTLP JSON (resourceLogs[])
+```
 
-## Deploy on Vercel
+### Data flow
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. `page.tsx` runs on the server, calls `fetchAndTransformLogs()` which fetches the OTLP API and flattens the nested `resourceLogs` structure into a `FlatLogRecord[]`.
+2. The flat records are passed as props to `LogViewerShell`, a client component that owns all interactive state via `useReducer`.
+3. The shell derives histogram buckets and optional service groups via `useMemo` and passes them down to the display components.
+4. Clicking **Refresh** in `LogViewerToolbar` triggers a client-side fetch that goes through the same transform pipeline and dispatches `SET_RECORDS` to update the state.
