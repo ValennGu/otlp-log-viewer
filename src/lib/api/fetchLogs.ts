@@ -1,7 +1,8 @@
 import { FlatLogRecord } from "@/lib/otlp/types";
 import { transformOtlpResponse } from "@/lib/otlp/transform";
 
-const API_URL = "https://take-home-assignment-otlp-logs-api.vercel.app/api/logs";
+const API_URL =
+  "https://take-home-assignment-otlp-logs-api.vercel.app/api/logs";
 
 export { API_URL };
 

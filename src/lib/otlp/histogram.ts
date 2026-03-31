@@ -9,12 +9,15 @@ export interface HistogramBucket {
 }
 
 function emptyBreakdown(): Record<SeverityLevel, number> {
-  return Object.fromEntries(SEVERITY_LEVELS.map((l) => [l, 0])) as Record<SeverityLevel, number>;
+  return Object.fromEntries(SEVERITY_LEVELS.map((l) => [l, 0])) as Record<
+    SeverityLevel,
+    number
+  >;
 }
 
 export function buildHistogramBuckets(
   records: FlatLogRecord[],
-  bucketCount = 20
+  bucketCount = 20,
 ): HistogramBucket[] {
   if (records.length === 0) return [];
 
@@ -38,23 +41,34 @@ export function buildHistogramBuckets(
     return [bucket];
   }
 
+  // Creates empty buckets.
   const bucketWidth = (maxTs - minTs) / bucketCount;
-  const buckets: HistogramBucket[] = Array.from({ length: bucketCount }, (_, i) => ({
-    label: new Intl.DateTimeFormat("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    }).format(new Date(minTs + i * bucketWidth)),
-    startMs: minTs + i * bucketWidth,
-    count: 0,
-    breakdown: emptyBreakdown(),
-  }));
+  const buckets: HistogramBucket[] = Array.from(
+    { length: bucketCount },
+    (_, i) => ({
+      label: new Intl.DateTimeFormat("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      }).format(new Date(minTs + i * bucketWidth)),
+      startMs: minTs + i * bucketWidth,
+      count: 0,
+      breakdown: emptyBreakdown(),
+    }),
+  );
 
   for (const record of records) {
+    /*
+     * Gets the target bucket index. Example:
+     * (1342 - 1000) / 100 = 3.42
+     * Math.floor(3.42)    = 3       ← bucket index 3
+     * Math.min(3, 9)      = 3       ← within bounds, no clamp needed
+     */
+
     const idx = Math.min(
       Math.floor((record.timestampMs - minTs) / bucketWidth),
-      bucketCount - 1
+      bucketCount - 1,
     );
     buckets[idx].count++;
     buckets[idx].breakdown[record.severityLevel]++;

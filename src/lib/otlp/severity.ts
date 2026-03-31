@@ -10,6 +10,19 @@ export const SEVERITY_LEVELS: SeverityLevel[] = [
   "FATAL",
 ];
 
+// TODO: Consider a refactor on this.
+export function severityLevel(n: number): SeverityLevel {
+  if (n === 0) return SEVERITY_LEVELS[0];
+  if (n <= 4) return SEVERITY_LEVELS[1];
+  if (n <= 8) return SEVERITY_LEVELS[2];
+  if (n <= 12) return SEVERITY_LEVELS[3];
+  if (n <= 16) return SEVERITY_LEVELS[4];
+  if (n <= 20) return SEVERITY_LEVELS[5];
+  return SEVERITY_LEVELS[6];
+}
+
+// From here -- just CSS utils.
+
 export const SEVERITY_COLORS: Record<SeverityLevel, string> = {
   UNSPECIFIED: "#94a3b8",
   TRACE: "#a78bfa",
@@ -35,13 +48,3 @@ export const SEVERITY_ROW_CLASSES: Partial<Record<SeverityLevel, string>> = {
   ERROR: "bg-red-50",
   FATAL: "bg-red-100",
 };
-
-export function severityLevel(n: number): SeverityLevel {
-  if (n === 0) return "UNSPECIFIED";
-  if (n <= 4) return "TRACE";
-  if (n <= 8) return "DEBUG";
-  if (n <= 12) return "INFO";
-  if (n <= 16) return "WARN";
-  if (n <= 20) return "ERROR";
-  return "FATAL";
-}

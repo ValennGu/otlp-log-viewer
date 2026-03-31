@@ -1,6 +1,7 @@
 import { FlatLogRecord, ServiceGroup } from "@/lib/otlp/types";
 import LogGroupHeader from "./LogGroupHeader";
 import LogTableRow from "./LogTableRow";
+import React from "react";
 
 interface Props {
   records: FlatLogRecord[];
@@ -36,36 +37,34 @@ export default function LogTable({
           </tr>
         </thead>
         <tbody>
-          {groups === null ? (
-            records.map((record) => (
-              <LogTableRow
-                key={record.id}
-                record={record}
-                isExpanded={expandedRows.has(record.id)}
-                onToggle={() => onToggleRow(record.id)}
-              />
-            ))
-          ) : (
-            groups.map((group) => (
-              <>
-                <LogGroupHeader
-                  key={`group-${group.key}`}
-                  group={group}
-                  isCollapsed={collapsedGroups.has(group.key)}
-                  onToggle={() => onToggleGroup(group.key)}
+          {groups === null
+            ? records.map((record) => (
+                <LogTableRow
+                  key={record.id}
+                  record={record}
+                  isExpanded={expandedRows.has(record.id)}
+                  onToggle={() => onToggleRow(record.id)}
                 />
-                {!collapsedGroups.has(group.key) &&
-                  group.records.map((record) => (
-                    <LogTableRow
-                      key={record.id}
-                      record={record}
-                      isExpanded={expandedRows.has(record.id)}
-                      onToggle={() => onToggleRow(record.id)}
-                    />
-                  ))}
-              </>
-            ))
-          )}
+              ))
+            : groups.map((group) => (
+                <React.Fragment key={group.key}>
+                  <LogGroupHeader
+                    key={`group-${group.key}`}
+                    group={group}
+                    isCollapsed={collapsedGroups.has(group.key)}
+                    onToggle={() => onToggleGroup(group.key)}
+                  />
+                  {!collapsedGroups.has(group.key) &&
+                    group.records.map((record) => (
+                      <LogTableRow
+                        key={record.id}
+                        record={record}
+                        isExpanded={expandedRows.has(record.id)}
+                        onToggle={() => onToggleRow(record.id)}
+                      />
+                    ))}
+                </React.Fragment>
+              ))}
         </tbody>
       </table>
     </div>

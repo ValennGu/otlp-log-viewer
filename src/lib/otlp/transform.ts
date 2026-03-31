@@ -1,7 +1,7 @@
 import { FlatLogRecord, ServiceGroup } from "./types";
 import { severityLevel } from "./severity";
 
-interface IKeyValue {
+interface IResourceAttribute {
   key: string;
   value?: {
     stringValue?: string;
@@ -12,7 +12,9 @@ interface IKeyValue {
   };
 }
 
-function kvToRecord(kvs: IKeyValue[] | undefined): Record<string, string> {
+function resourceAttributeToRecord(
+  kvs: IResourceAttribute[] | undefined,
+): Record<string, string> {
   if (!kvs) return {};
   const result: Record<string, string> = {};
   for (const kv of kvs) {
@@ -20,12 +22,30 @@ function kvToRecord(kvs: IKeyValue[] | undefined): Record<string, string> {
     if (!v) continue;
     if (v.stringValue !== undefined) result[kv.key] = v.stringValue;
     else if (v.intValue !== undefined) result[kv.key] = String(v.intValue);
-    else if (v.doubleValue !== undefined) result[kv.key] = String(v.doubleValue);
+    else if (v.doubleValue !== undefined)
+      result[kv.key] = String(v.doubleValue);
     else if (v.boolValue !== undefined) result[kv.key] = String(v.boolValue);
     else result[kv.key] = JSON.stringify(v);
   }
   return result;
 }
+
+/**
+ * The endpoint returns OTLP (OpenTelemetry Protocol) log data — JSON structured as:                                          
+                                                                                                                            
+  resourceLogs[]                                                                                                             
+    └─ resource     ← tells the actual service logs belong to.                                                                                                      
+    │    └─ attributes: service.namespace, service.name, service.version                                                     
+    └─ scopeLogs[]                                                                                                           
+         └─ scope
+         │    └─ attributes     ← tells the actual instrumentation all logs in the scope have.                                        
+         └─ logRecords[]                                                                                                     
+              ├─ timeUnixNano                                                                                                
+              ├─ observedTimeUnixNano                                                                                        
+              ├─ severityNumber (0–24)                                                                                       
+              ├─ severityText (TRACE / DEBUG / INFO / WARN / ERROR / FATAL / UNSPECIFIED)                                    
+              └─ body.stringValue  ← the actual log message  
+ */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function transformOtlpResponse(response: any): FlatLogRecord[] {
@@ -34,7 +54,7 @@ export function transformOtlpResponse(response: any): FlatLogRecord[] {
 
   for (let ri = 0; ri < resourceLogs.length; ri++) {
     const rl = resourceLogs[ri];
-    const resourceAttrs = kvToRecord(rl?.resource?.attributes);
+    const resourceAttrs = resourceAttributeToRecord(rl?.resource?.attributes);
     const serviceName = resourceAttrs["service.name"] ?? "";
     const serviceNamespace = resourceAttrs["service.namespace"] ?? "";
     const serviceVersion = resourceAttrs["service.version"] ?? "";
@@ -42,11 +62,13 @@ export function transformOtlpResponse(response: any): FlatLogRecord[] {
 
     for (let si = 0; si < scopeLogs.length; si++) {
       const sl = scopeLogs[si];
-      const scopeAttrs = kvToRecord(sl?.scope?.attributes);
+      const scopeAttrs = resourceAttributeToRecord(sl?.scope?.attributes);
       const logRecords = sl?.logRecords ?? [];
 
       for (let li = 0; li < logRecords.length; li++) {
         const lr = logRecords[li];
+
+        // --- Next lines could be extracted to a utils. TODO: Consider a refactor on this.
         const raw: string = lr?.timeUnixNano ?? "0";
         const timestampMs = Number(BigInt(raw) / BigInt(1_000_000));
         const timestampDisplay = new Intl.DateTimeFormat("en-US", {
@@ -59,10 +81,12 @@ export function transformOtlpResponse(response: any): FlatLogRecord[] {
           fractionalSecondDigits: 3,
           hour12: false,
         }).format(new Date(timestampMs));
+        // ---
+        // End of utils extraction candidate.
 
         const severityNum: number = lr?.severityNumber ?? 0;
         const level = severityLevel(severityNum);
-        const attributes = kvToRecord(lr?.attributes);
+        const attributes = resourceAttributeToRecord(lr?.attributes);
 
         let body = "";
         const bodyValue = lr?.body;
@@ -98,7 +122,11 @@ export function transformOtlpResponse(response: any): FlatLogRecord[] {
 export function groupByService(records: FlatLogRecord[]): ServiceGroup[] {
   const map = new Map<string, ServiceGroup>();
   for (const record of records) {
-    const key = [record.serviceName, record.serviceNamespace, record.serviceVersion].join("|");
+    const key = [
+      record.serviceName,
+      record.serviceNamespace,
+      record.serviceVersion,
+    ].join("|");
     if (!map.has(key)) {
       map.set(key, {
         key,
@@ -111,6 +139,6 @@ export function groupByService(records: FlatLogRecord[]): ServiceGroup[] {
     map.get(key)!.records.push(record);
   }
   return Array.from(map.values()).sort((a, b) =>
-    a.serviceName.localeCompare(b.serviceName)
+    a.serviceName.localeCompare(b.serviceName),
   );
 }
