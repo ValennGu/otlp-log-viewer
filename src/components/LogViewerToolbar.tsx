@@ -33,13 +33,13 @@ export default function LogViewerToolbar({
           }`}
         >
           <span
-            className={`inline-block w-8 h-4 rounded-full transition-colors ${
+            className={`relative inline-block w-8 h-4 rounded-full transition-colors ${
               groupByService ? "bg-blue-500" : "bg-slate-300"
             }`}
           >
             <span
-              className={`inline-block w-3 h-3 bg-white rounded-full shadow transition-transform mt-0.5 ${
-                groupByService ? "translate-x-4.5" : "translate-x-0.5"
+              className={`absolute top-0.5 w-3 h-3 -ml-3.25 bg-white rounded-full shadow transition-transform ${
+                groupByService ? "translate-x-3.5" : ""
               }`}
             />
           </span>
